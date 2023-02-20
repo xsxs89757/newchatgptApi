@@ -1,0 +1,17 @@
+/.idea
+/.vscode
+/vendor
+/node_modules
+*.log
+*-audit.json
+.env
+yarn.lock
+/tests/tmp
+/tests/.phpunit.result.cache
+.DS_Store
+
+/logs/*
+
+#配置文件需要屏蔽
+.accountList.json
+package-lock.json
