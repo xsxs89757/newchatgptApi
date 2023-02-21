@@ -29,10 +29,10 @@ const logger = winston.createLogger({
     ]
 })
 
-let _accessToken = null
+let _accessToken = null,_replyAccessToken = 0
 
 const getAccessToken = async() => {
-    const index = Math.floor((Math.random()*data.length));
+    const index = Math.floor((Math.random()*data.length))
     const result = await request.post('http://43.153.18.225:5000')
                     .send({u:data[index].email,p:data[index].password})
     if(result.body.code === 0){
@@ -42,8 +42,14 @@ const getAccessToken = async() => {
     }
 }
 
-await getAccessToken()
+const replyAccessToken = async() => {
+    if(_replyAccessToken <= 3 ){
+        _replyAccessToken++
+        await getAccessToken()
+    }
+}
 
+await getAccessToken()
 setInterval( async()=>{
     await getAccessToken()
 }, 4 * 60 * 60 * 1000),
@@ -97,6 +103,8 @@ function sendEventsToAll(text, clientId) {
     })
 }
 
+
+
 app.post("/chatgpt", async (req, res) => {
     const server = req?.body?.server
     const conversationId = req?.body?.conversation_id
@@ -109,15 +117,22 @@ app.post("/chatgpt", async (req, res) => {
     if(_accessToken === null){
         return res.json({ code: 1, msg: 'accessToken error' })
     }
+    const proxyUrl = [
+        'https://chat.duti.tech/api/conversation',
+        'https://gpt.pawan.krd/backend-api/conversation'
+    ]
+    const index = Math.floor((Math.random()*proxyUrl.length))
     try {
         const api = new ChatGPTUnofficialProxyAPI({
-            accessToken: _accessToken
+            accessToken: _accessToken,
+            apiReverseProxyUrl: proxyUrl[index]
         })
         let response = await api.sendMessage(subject, {
             conversationId,
             parentMessageId,
-            timeoutMs: 3 * 60 * 1000,
+            timeoutMs: 3 * 60 * 1000, 
             onProgress: (partialResponse) => {
+                console.log(partialResponse.text)
                 sendEventsToAll(partialResponse.text, clientId)
             }
         })
@@ -127,10 +142,11 @@ app.post("/chatgpt", async (req, res) => {
             content : response.text,
             conversation_id: response.conversationId,
             parent_message_id : response.parentMessageId,
-            server: 1
+            server: index
         }})
     }catch(err) {
         console.log(err)
+        await replyAccessToken()
         logger.error("ERROR_TIME:"+getCurrentTime())
         logger.error("ERROR:" + err.toString())
         logger.error("--------------------------------")
